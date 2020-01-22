@@ -1,11 +1,14 @@
 from xicam.plugins import GUILayout, GUIPlugin
 from xicam.gui.widgets.imageviewmixins import CatalogView, BetterButtons
 from qtpy.QtWidgets import (QLabel, QHBoxLayout, QWidget, QPushButton, 
-                        QMessageBox)
+                        QMessageBox, QVBoxLayout)
 from xicam.core.msg import notifyMessage
 
 # not explicitly needed, could be useful for type hint
 from databroker.core import BlueskyRun
+
+# Import workflow stuff (from operationplugin branch)
+from .workflows import MyWorkflow
 
 # Create a blend of class from 2 xicam image view mixins
 class MyImageViewer(BetterButtons, CatalogView):
@@ -17,7 +20,8 @@ class MyGUIPlugin(GUIPlugin):
     # defines name for plugin for display in xi-cam
     name = 'My Plugin'  
     def __init__(self):
-
+        # Define workflows
+        self.my_workflow = MyWorkflow()
         
         # Define stages
         # GUILayout must provide a center widget
@@ -27,11 +31,12 @@ class MyGUIPlugin(GUIPlugin):
         
         # # 2: instead using MyImageViewer.  Adds different buttons to catalogview
         # self.catalog_view = MyImageViewer()
-        # stage_layout = GUILayout(lefttop=lefttop_widget, center=self.catalog_view)
+        # stage_layout = GUILayout(lefttop=lefttop_widget, 
+        #                       center=self.catalog_view)
 
         # 3: more complicated center widget
         center_widget = QWidget() # center widget base
-        layout = QHBoxLayout() # Inialize horizontal layout
+        layout = QVBoxLayout() # Inialize horizontal layout
         self.catalog_view = MyImageViewer()
         self.label = QLabel("1")
         layout.addWidget(self.catalog_view)  # Add first Horiz widget to layout
@@ -52,7 +57,7 @@ class MyGUIPlugin(GUIPlugin):
         #   function/SLOT called when SIGNAL emitted (event happens)
         self.button.clicked.connect(self.update_label)
         self.button.clicked.connect(self.show_message)
-
+        self.button.clicked.connect(self.run_workflow)
         # self.stages defines GUILayouts
         # self.stages is a dictionary contianing:
         #       stage name -> GUILayout
@@ -66,7 +71,7 @@ class MyGUIPlugin(GUIPlugin):
         # here need to run super after GUILayouts
         super(MyGUIPlugin, self).__init__()
 
-    # Slots for connections to signals
+    # Slots for connections to signals ---------------------------------------
     def update_label(self):
         """ <SLOT> Method to pass into connection """ 
         current_text = self.label.text()
@@ -78,6 +83,39 @@ class MyGUIPlugin(GUIPlugin):
         # self designates what widget to show above
         notifyMessage('Add Another 1.')
 
+    def show_message(self, catalog:BlueskyRun):
+        """ <SLOT> """
+        notifyMessage('print catalog: {}'.format(catalog))
+
+    def run_workflow(self):
+        """ 
+        <SLOT> run our workflow 
+        Workflow class has an exec() and exec() all to run itself
+        """
+        # extract data from loaded catalog (assumes button is enabled)
+        if not self.catalog_view.catalog:
+            notifyMessage('No catalog loaded, please open one')
+            return 
+            
+        # primary and 'img' should not be hard coded here
+        # # to_dask gives lazy objects
+        # image_data = self.catalog_view.catalog.primary.to_dask['img'].compute
+        image_data = self.catalog_view.catalog.primary.read()['img']
+        # can pass in input data, and function to call when it's done
+        self.my_workflow.execute(input_image=image_data, 
+                                callback_slot=self.show_fft)
+
+    # Workflow callback_slot's have *results passed into them
+    # results: a list of result objects
+    # eg: [{'output_image': np.ndarray}]
+    def show_fft(self, *results):
+        fft_image = results[-1]['output_image']
+        import matplotlib.pyplot as plt
+        plt.imshow(fft_image[0])
+        plt.show()
+
+    #-------------------------------------------------------------------------
+    
     # Overrides GUIPlugin's method
     # Tells xicam what to do when catalog is opened under this plugin
     # eg in CatalogViewer, it was a qtGraphViewer

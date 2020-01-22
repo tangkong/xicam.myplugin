@@ -11,10 +11,10 @@ setup(name='xicam.myplugin',
           # class is called 'MyPlugin'
           'xicam.plugins.GUIPlugin': [
               'MyPlugin=xicam.myplugin:MyGUIPlugin'
-          ] #,
-        #   'xicam.plugins.OperationPlugin': [
-        #       'invert=xicam.sampleplugin.operations:invert'
-        #       'random_noise=xicam.sampleplugin.operations.noise:random_noise'
-        #   ]
+          ] ,
+          'xicam.plugins.OperationPlugin': [
+              'fft=xicam.myplugin.operations:fft'
+              # 'random_noise=xicam.sampleplugin.operations.noise:random_noise'
+          ]
       }
      )
