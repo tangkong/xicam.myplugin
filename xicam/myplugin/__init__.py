@@ -12,10 +12,34 @@ from databroker.core import BlueskyRun
 from .workflows import MyWorkflow
 
 # Create a blend of class from 2 xicam image view mixins
+# a basic imae view for handling catalogs
 class MyImageView(BetterButtons, CatalogView):
     def __init__(self, *args, **kwargs):
         super(MyImageView, self).__init__(*args, **kwargs)
 
+# Create custom imageview
+# WIdget that shows catalog view and results image view
+class MyImageWidget(QWidget):
+    def __init__(self):
+        super(MyImageWidget, self).__init__()
+        self.splitter = QSplitter(Qt.Horizontal)
+        self.catalog_view = MyImageView()
+        self.results_view = ImageView()
+
+        # When pulling out, need to make sure other modules reference 
+        # viewers correctly .....
+        self.splitter.addWidget(self.catalog_view)
+        self.splitter.addWidget(self.results_view)
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.splitter)
+        self.setLayout(layout)
+
+    def set_image(self, image):
+        self.results_view.setImage(image)
+
+    def catalog(self):
+        return self.catalog_view.catalog
 
 class MyGUIPlugin(GUIPlugin):
     # defines name for plugin for display in xi-cam
@@ -25,35 +49,16 @@ class MyGUIPlugin(GUIPlugin):
         self.my_workflow = MyWorkflow()
         
         # Define stages
+        
         # GUILayout must provide a center widget
-        
-        # # 1: Basic center catalog view widget
-        # self.catalog_view = CatalogView() # QLabel('hello')
-        
-        # # 2: instead using MyImageView.  Adds different buttons to catalogview
-        # self.catalog_view = MyImageView()
-        # stage_layout = GUILayout(lefttop=lefttop_widget, 
-        #                       center=self.catalog_view)
+        # Use a subclass to group some widget
+        self.center_widget = MyImageWidget()
 
-        # 3: more complicated center widget
-        center_widget = QSplitter(Qt.Horizontal) # QWidget() # center widget base
-        layout = QVBoxLayout() # Inialize vertical layout
-        self.catalog_view = MyImageView()
-        self.results_view = ImageView()
-        center_widget.addWidget(self.catalog_view)
-        center_widget.addWidget(self.results_view)
-        
-        self.label = QLabel("1")
-        layout.addWidget(center_widget)  # Add first Horiz widget to layout
-        layout.addWidget(self.label) # Add second Horiz widget layout
-        # 4: adding buttons etc 
+        # Adding button 
         self.button = QPushButton("Button")
-        layout.addWidget(self.button)
-        # (3,4) initializing center widget
-        container_widget = QWidget()
-        container_widget.setLayout(layout)
+
         # Must pass a widget to GUILayout.  Widgets have layouts though
-        stage_layout = GUILayout(center=container_widget) 
+        stage_layout = GUILayout(center=self.center_widget, bottom=self.button) 
 
         # Define some connections
         # SYNTAX: variable.<SIGNAL>.connect(<SLOT>:function)
@@ -99,14 +104,14 @@ class MyGUIPlugin(GUIPlugin):
         Workflow class has an exec() and exec() all to run itself
         """
         # extract data from loaded catalog (assumes button is enabled)
-        if not self.catalog_view.catalog:
+        if not self.center_widget.catalog():
             notifyMessage('No catalog loaded, please open one')
             return 
             
         # primary and 'img' should not be hard coded here
         # # to_dask gives lazy objects
         # image_data = self.catalog_view.catalog.primary.to_dask['img'].compute
-        image_data = self.catalog_view.catalog.primary.read()['img']
+        image_data = self.center_widget.catalog().primary.read()['img']
         # can pass in input data, and function to call when it's done
         self.my_workflow.execute(input_image=image_data, 
                                 callback_slot=self.show_fft)
@@ -123,7 +128,7 @@ class MyGUIPlugin(GUIPlugin):
 
         # Show all results
         fft_image = results[-1]['output_image']
-        self.results_view.setImage(fft_image)
+        self.center_widget.set_image(fft_image)
     #-------------------------------------------------------------------------
     
     # Overrides GUIPlugin's method
@@ -141,4 +146,4 @@ class MyGUIPlugin(GUIPlugin):
 
         # need this line to tell xicam what to do with catalog.
         # here, opening a file displays it to the catalog_view
-        self.catalog_view.setCatalog(catalog, 'primary', 'img')
+        self.center_widget.catalog_view.setCatalog(catalog, 'primary', 'img')
