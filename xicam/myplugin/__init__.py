@@ -1,8 +1,9 @@
 from xicam.plugins import GUILayout, GUIPlugin
-from xicam.gui.widgets.imageviewmixins import CatalogView, BetterButtons
+from xicam.gui.widgets.imageviewmixins import CatalogView, BetterButtons, ImageView
 from qtpy.QtWidgets import (QLabel, QHBoxLayout, QWidget, QPushButton, 
-                        QMessageBox, QVBoxLayout)
+                        QMessageBox, QVBoxLayout, QSplitter)
 from xicam.core.msg import notifyMessage
+from qtpy.QtCore import Qt
 
 # not explicitly needed, could be useful for type hint
 from databroker.core import BlueskyRun
@@ -11,9 +12,9 @@ from databroker.core import BlueskyRun
 from .workflows import MyWorkflow
 
 # Create a blend of class from 2 xicam image view mixins
-class MyImageViewer(BetterButtons, CatalogView):
+class MyImageView(BetterButtons, CatalogView):
     def __init__(self, *args, **kwargs):
-        super(MyImageViewer, self).__init__(*args, **kwargs)
+        super(MyImageView, self).__init__(*args, **kwargs)
 
 
 class MyGUIPlugin(GUIPlugin):
@@ -29,25 +30,30 @@ class MyGUIPlugin(GUIPlugin):
         # # 1: Basic center catalog view widget
         # self.catalog_view = CatalogView() # QLabel('hello')
         
-        # # 2: instead using MyImageViewer.  Adds different buttons to catalogview
-        # self.catalog_view = MyImageViewer()
+        # # 2: instead using MyImageView.  Adds different buttons to catalogview
+        # self.catalog_view = MyImageView()
         # stage_layout = GUILayout(lefttop=lefttop_widget, 
         #                       center=self.catalog_view)
 
         # 3: more complicated center widget
-        center_widget = QWidget() # center widget base
-        layout = QVBoxLayout() # Inialize horizontal layout
-        self.catalog_view = MyImageViewer()
+        center_widget = QSplitter(Qt.Horizontal) # QWidget() # center widget base
+        layout = QVBoxLayout() # Inialize vertical layout
+        self.catalog_view = MyImageView()
+        self.results_view = ImageView()
+        center_widget.addWidget(self.catalog_view)
+        center_widget.addWidget(self.results_view)
+        
         self.label = QLabel("1")
-        layout.addWidget(self.catalog_view)  # Add first Horiz widget to layout
+        layout.addWidget(center_widget)  # Add first Horiz widget to layout
         layout.addWidget(self.label) # Add second Horiz widget layout
         # 4: adding buttons etc 
         self.button = QPushButton("Button")
         layout.addWidget(self.button)
         # (3,4) initializing center widget
-        center_widget.setLayout(layout)
+        container_widget = QWidget()
+        container_widget.setLayout(layout)
         # Must pass a widget to GUILayout.  Widgets have layouts though
-        stage_layout = GUILayout(center=center_widget) 
+        stage_layout = GUILayout(center=container_widget) 
 
         # Define some connections
         # SYNTAX: variable.<SIGNAL>.connect(<SLOT>:function)
@@ -109,11 +115,15 @@ class MyGUIPlugin(GUIPlugin):
     # results: a list of result objects
     # eg: [{'output_image': np.ndarray}]
     def show_fft(self, *results):
-        fft_image = results[-1]['output_image']
-        import matplotlib.pyplot as plt
-        plt.imshow(fft_image[0])
-        plt.show()
+        # # To show only first frame of fft'd in popout mpl windows
+        # fft_image = results[-1]['output_image']
+        # import matplotlib.pyplot as plt
+        # plt.imshow(fft_image[0])
+        # plt.show()
 
+        # Show all results
+        fft_image = results[-1]['output_image']
+        self.results_view.setImage(fft_image)
     #-------------------------------------------------------------------------
     
     # Overrides GUIPlugin's method

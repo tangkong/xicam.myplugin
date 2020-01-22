@@ -1,6 +1,5 @@
 # Import workflow stuff (from operationplugin branch)
 from xicam.core.execution import Workflow
-from xicam.plugins.operationplugin import OperationPlugin
 
 from ..operations import fft
 
@@ -10,5 +9,5 @@ class MyWorkflow(Workflow):
         
         self.add_operation(fft)
         # can add other operations 
-
-        self.auto_connect_all()
+        # self.add_operation(threshold)
+        # self.auto_connect_all()
